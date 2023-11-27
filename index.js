@@ -1,6 +1,8 @@
 const express = require("express");
 const sqlite3 = require("sqlite3").verbose();
 const bcrypt = require("bcrypt");
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpec = require("./swaggerConfig");
 const app = express();
 const port = 3000;
 
@@ -24,6 +26,7 @@ db.serialize(() => {
   );
 });
 
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // Middleware para parsear el cuerpo de las solicitudes como JSON
 app.use(express.json());
 
@@ -37,7 +40,58 @@ const hashPasswordMiddleware = async (req, res, next) => {
   next();
 };
 
-// Endpoint para registro de usuarios
+/**
+ * @swagger
+ * /register:
+ *   post:
+ *     summary: Registrar un nuevo usuario (dueño o cliente)
+ *     description: Endpoint para registrar un nuevo usuario en la aplicación.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               phone_number:
+ *                 type: string
+ *                 description: Número de teléfono del usuario.
+ *               password:
+ *                 type: string
+ *                 description: Contraseña del usuario.
+ *               is_owner:
+ *                 type: boolean
+ *                 description: Indica si el usuario es un dueño.
+ *               client_name:
+ *                 type: string
+ *                 description: Nombre del cliente (requerido si is_owner es falso).
+ *             required:
+ *               - phone_number
+ *               - password
+ *               - is_owner
+ *     responses:
+ *       201:
+ *         description: Usuario registrado exitosamente.
+ *         content:
+ *           application/json:
+ *             example:
+ *               id: 1
+ *               phone_number: "123456789"
+ *               is_owner: true
+ *               client_name: "Nombre del Cliente"
+ *       400:
+ *         description: Campos incompletos o inválidos en la solicitud.
+ *         content:
+ *           application/json:
+ *             example:
+ *               error: "Campos incompletos"
+ *       500:
+ *         description: Error interno del servidor.
+ *         content:
+ *           application/json:
+ *             example:
+ *               error: "Error interno del servidor"
+ */
 app.post("/register", hashPasswordMiddleware, (req, res) => {
   const { phone_number, password, is_owner, client_name } = req.body;
   console.log("entrandoendpoint", req.body);
@@ -72,7 +126,49 @@ app.post("/register", hashPasswordMiddleware, (req, res) => {
   });
 });
 
-// Endpoint para inicio de sesión de usuarios
+/**
+ * @swagger
+ * /login:
+ *   post:
+ *     summary: Iniciar sesión de usuario
+ *     description: Endpoint para autenticar a un usuario y obtener un token de sesión.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               phone_number:
+ *                 type: string
+ *                 description: Número de teléfono del usuario.
+ *               password:
+ *                 type: string
+ *                 description: Contraseña del usuario.
+ *             required:
+ *               - phone_number
+ *               - password
+ *     responses:
+ *       200:
+ *         description: Inicio de sesión exitoso.
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               is_owner: true
+ *       401:
+ *         description: Credenciales inválidas.
+ *         content:
+ *           application/json:
+ *             example:
+ *               error: "Credenciales inválidas"
+ *       400:
+ *         description: Campos incompletos o inválidos en la solicitud.
+ *         content:
+ *           application/json:
+ *             example:
+ *               error: "Campos incompletos"
+ */
 app.post("/login", async (req, res) => {
   const { phone_number, password } = req.body;
 
@@ -251,7 +347,43 @@ const queryUser = (tableName, phone_number, password) => {
 // Middleware para parsear el cuerpo de las solicitudes como JSON
 app.use(express.json());
 
-// Endpoint para obtener todos los usuarios
+/**
+ * @swagger
+ * /users:
+ *   get:
+ *     summary: Obtiene la lista de usuarios
+ *     description: Endpoint para obtener todos los usuarios registrados.
+ *     responses:
+ *       200:
+ *         description: Respuesta exitosa. Devuelve la lista de usuarios.
+ *         content:
+ *           application/json:
+ *             example:
+ *               - id: 1
+ *                 phone_number: "123456789"
+ *                 password: "hashedpassword"
+ *                 is_owner: 0
+ *               - id: 2
+ *                 phone_number: "987654321"
+ *                 password: "hashedpassword"
+ *                 is_owner: 1
+ *       500:
+ *         description: Error interno del servidor.
+ *         content:
+ *           application/json:
+ *             example:
+ *               error: "Error interno del servidor"
+ */
+app.get("/users", (req, res) => {
+  db.all("SELECT * FROM users", (err, rows) => {
+    if (err) {
+      console.error(err.message);
+      res.status(500).json({ error: "Error interno del servidor" });
+    } else {
+      res.json(rows);
+    }
+  });
+});
 app.get("/users", (req, res) => {
   db.all("SELECT * FROM users", (err, rows) => {
     if (err) {
